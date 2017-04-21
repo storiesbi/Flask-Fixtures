@@ -10,6 +10,7 @@
 from __future__ import absolute_import
 
 import abc
+import inspect
 import os
 import logging
 
@@ -76,13 +77,44 @@ class YAMLLoader(FixtureLoader):
         with open(filename) as fin:
             return yaml.load(fin)
 
+_custom_loaders = []
+
+
+def _is_loader(obj):
+    return inspect.isclass(obj) and issubclass(obj, FixtureLoader)
+
+
+def add(cls):
+    """Add custom loader."""
+    if not _is_loader(cls):
+        raise ValueError("Unsupported loader class.")
+
+    _custom_loaders.append(cls)
+
+
+def remove(cls):
+    """Remove custom loader."""
+    if not _is_loader(cls):
+        return
+
+    _custom_loaders.remove(cls)
+
+
+def _get_loaders_cls():
+    loaders = []
+    loaders.extend(_custom_loaders)
+    for cls in FixtureLoader.__subclasses__():
+        if cls not in _custom_loaders:
+            loaders.append(cls)
+
+    return loaders
+
 
 def load(filename):
     name, extension = os.path.splitext(filename)
-
-    for cls in FixtureLoader.__subclasses__():
-        # If a loader class has no extenions, log a warning so the developer knows
-        # that it will never be used anyhwhere
+    for cls in _get_loaders_cls():
+        # If a loader class has no extenions, log a warning so the developer
+        # knows that it will never be used anyhwhere
         if not hasattr(cls, 'extensions'):
             log.warn("The loader '{0}' is missing extensions and will not be used.".format(cls.__name__))
             continue
