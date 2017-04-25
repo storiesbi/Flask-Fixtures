@@ -13,6 +13,8 @@ import abc
 import os
 import logging
 
+from flask_fixtures import config
+from flask_fixtures.config import JSON_PARSE_DATETIME
 from .utils import print_info
 import six
 
@@ -65,7 +67,11 @@ class JSONLoader(FixtureLoader):
             return dct
 
         with open(filename) as fin:
-            return json.load(fin, object_hook=_datetime_parser)
+            parse_datetime = config.settings.get(JSON_PARSE_DATETIME)
+            if parse_datetime:
+                return json.load(fin, object_hook=_datetime_parser)
+            else:
+                return json.load(fin)
 
 
 class YAMLLoader(FixtureLoader):
