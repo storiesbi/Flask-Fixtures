@@ -15,6 +15,7 @@ import logging
 import os
 
 from sqlalchemy import Table
+from sqlalchemy.inspection import inspect
 
 from . import loaders
 from .utils import can_persist_fixtures
@@ -132,7 +133,27 @@ def load_fixtures(db, fixtures):
             module_name, class_name = fixture['model'].rsplit('.', 1)
             module = importlib.import_module(module_name)
             model = getattr(module, class_name)
+
             for fields in fixture['records']:
+                exists = False
+                inspected_model = inspect(model)
+
+                for primary_key in inspected_model.primary_key:
+                    if primary_key.key in fields and fields[primary_key.key]:
+                        if model.query.filter_by(**{primary_key.key: fields[primary_key.key]}).first():
+                            exists = True
+                            break
+                if not exists:
+                    for name, column in inspected_model.columns.items():
+                        if column.unique:
+                            if column.key in fields and fields[column.key]:
+                                if model.query.filter_by(**{column.key: fields[column.key]}).first():
+                                    exists = True
+                                    break
+
+                if exists:
+                    continue
+
                 obj = model(**fields)
                 db.session.add(obj)
             db.session.commit()
